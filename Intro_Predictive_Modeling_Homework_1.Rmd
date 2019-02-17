@@ -1,0 +1,342 @@
+---
+title: "Exercises 1"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Probability Practice**
+
+### *Part A.*
+
+For this problem, I will define event A to be a clicker answering Yes, and I will define event B to be a clicker answering truthfully. The rule of total probability gives:
+$$ P(A) = P(A|B)*P(B) + P(A|B^c)*P(B^c) $$
+We are looking to find $P(A|B)$, the probability that a truthful clicker answered yes, so we can rearrange the equation:
+$$P(A|B) = \dfrac{P(A) - P(A|B^c)*P(B^c)}{P(B)}$$
+We have that $P(A) = 0.65$. $P(A|B^c)$ is the probability that a random clicker answered yes, so we know that $P(A|B^c) = 0.5*0.65 = 0.15$. And then $P(B) = 0.7$. This gives us:
+$$P(A|B) = \dfrac{0.65 - 0.15}{0.7} = \dfrac{0.5}{0.7} = 0.714$$
+The fraction of people who are truthful clickers that answered yes is 0.714.
+
+### *Part B.*
+
+In this problem, I will define event A to be that someone has the disease, and I will define event B to be that someone tests positive. We are looking for the probability of someone having the disease given that they tested positive, $P(A|B)$, and we can use Bayes' rule to calculate this. 
+$$P(A|B) = \dfrac{P(A)*P(B|A)}{P(B)}$$
+We know that $P(A) = 0.000025$, and the *sensitivity* gives $P(B|A) = 0.993$. $P(B)$ can be broken down into the rule of total probability to say that:
+$$P(B) = P(B|A)*P(A) + P(B|A^c)*P(A^c)$$
+And this becomes $$P(B) = 0.993*0.000025 + (1-0.9999)*(1-0.000025) = 0.0001248$$
+Then $$P(A|B) = \dfrac{0.000025*0.993}{0.00001248} = 0.1989$$
+The probability that someone who tests positive will have the disease is 0.1989. This seems like a very low reliability for a test, and it would be unwise to implement this test universally. There are going to be many people, over 80% actually, that think they have the disease when in fact they do not. This can cause not only emotional stress but financial burden, because those false positive testers will probably take steps to get treatment, consult other doctors, etc. and these things cost a lot of money. Ultimately this test is not good enough to implement in practice because it performs too poorly and will cause undue burden to the patients.
+
+## **Exploratory analysis: green buildings**
+
+```{r, include=FALSE}
+# read in the data and look at summary
+buildings = read.csv('greenbuildings.csv')
+head(buildings)
+summary(buildings)
+
+# get subsets of green and not green buildings
+green = buildings[buildings$green_rating==1,]
+notgreen = buildings[buildings$green_rating!=1,]
+```
+
+The analysis made by the stats guru is not comprehensive and fails to consider a few key points, and can therefore by improved in several ways. His analysis assumes that all green buildings are lumped together when calculating the rent per square foot per year. This will not work because all buildings will have some different properties that will affect this rent, such as the geographic location, age, number of stories, and building class. It would then be beneficial to look at buildings with similar properties to the one that the Austin real estate developer is looking to build. Unfortunately, we can't look at similarities in the geographical area of the building because we don't have the data, but we can look at some of the other factors. An important thing to note is that I decided to include all of the data and not remove any outliers, because as mentioned by the stats guru, the median value should be robust to outliers anyway.
+
+```{r echo=FALSE}
+# plot of age vs rent for green buildings
+plot(green$age, green$Rent, pch=19, col='green3', xlab = 'Age', ylab = 'Rent', main = 'Age vs Rent of green buildings')
+```
+
+It can be seen that age doesn't really play a role in the rent price of green buildings, and that is confirmed when looking at the correlation between the two variables. Another factor to consider is the class of the building.
+
+```{r echo=FALSE, fig.height=4, fig.width=6}
+# set up class subsets
+classA = subset(green, green$class_a==1)
+classB = subset(green, green$class_b==1)
+
+# histogram comparing rent for building class of green buildings
+hist(classA$Rent, border=rgb(0,100,0,100,maxColorValue=255), col= rgb(0,100,0,50,maxColorValue=255), xlab = 'Rent', ylab = 'Frequency', main = 'Rent in Class A and Class B green buildings')
+hist(classB$Rent, add=TRUE, border='darkgrey', col='darkgrey')
+```
+
+Here is the distribution of rent prices in class A green buildings overlayed with the distribution of rent in class B green buildings.
+
+```{r echo=FALSE, fig.height=4, fig.width=6}
+hist(classA$Rent, border=rgb(0,100,0,100,maxColorValue=255), col= rgb(0,100,0,50,maxColorValue=255), xlab = 'Rent', ylab = 'Frequency', main = 'Rent in Class A and Class B green buildings')
+hist(classB$Rent, add=TRUE, border='darkgrey', col='darkgrey')
+# show the median values
+abline(v=median(classA$Rent), lwd=4, col='blue')
+abline(v=median(classB$Rent), lwd=4, col='red')
+```
+
+ The blue line shows the median value of rent for class A, and the red line shows the median value of rent for class B. It can easily be seen that a class A building is likely going to bring in more rent, so the income expected from the new building investment will depend on what class of building it will be.
+
+Finally, an important factor to consider will be the number of stories of the new building. Because it has been specified to be 15 stories, I looked at all of the green buildings in the dataset that also had 15 stories, and compared their rent prices to that of all non-green buildings.
+
+```{r echo=FALSE, fig.height=3, fig.width=5}
+# histogram of rent of all green buildings
+hist(notgreen$Rent, border='darkgrey', col='grey', xlab = "Rent", ylab = "Frequency", main = "Rent of all non-green buildings")
+abline(v=median(notgreen$Rent), lwd=4, col='blue')
+```
+
+Here the median rent of all non-green buildings is shown to be 25, in dollars per square foot per year. Now looking at the green buildings with 15 stories:
+
+```{r echo=FALSE, fig.height=3, fig.width=5}
+# histogram of the green buildings with 15 stories
+similar = green[green$stories==15,]
+hist(similar$Rent, border=rgb(0,100,0,100,maxColorValue=255), col= rgb(0,100,0,50,maxColorValue=255), xlab = "Rent", ylab = "Frequency", main = "Rent of 15 story green buildings")
+abline(v=median(similar$Rent), lwd=4, col='blue')
+```
+
+Here the median value of rent is about 37 - much higher than that of non-green buildings. This could actually mean that the value of investing in a green building with 15 stories is much higher than expected, and that the developer could expect to recuperate costs of the green building premium much quicker than previously thought. It can't be directly calculated however, because of the other factors involved. For example, the fact that the building will be on East Cesar Chavez may mean it could bring in less rent than anticipated due to its location, but that can't necessarily be quantified here. My recommendation for the developer would be to look at buildings with similar features in that area of Austin to get an idea for how that will impact the rent, and then a more comprehensive assessment can be made as to the value of the investment.
+
+
+## **Bootstrapping** ##
+
+In order to analyze the risk/return properties of each of the five ETFs, I first took a look at some of the summary data for these ETFs.
+
+```{r, include=FALSE}
+library(mosaic)
+library(quantmod)
+library(foreach)
+
+mystocks = c("SPY", "TLT", "LQD", "EEM", "VNQ")
+getSymbols(mystocks, from = "2008-01-01")
+
+for(ticker in mystocks) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+
+all_returns = cbind(ClCl(SPYa),
+                     ClCl(TLTa),
+                     ClCl(LQDa),
+                     ClCl(EEMa),
+                     ClCl(VNQa))
+
+all_returns = as.matrix(na.omit(all_returns))
+```
+```{r, echo=FALSE}
+summary(all_returns)
+```
+
+I wanted to specifically look at the min and max statistics for each ETF, as that would give me an idea of how the ETF typically performs in terms of risk and return - with min being a measure of risk, and max being a measure of return. 
+
+We can see that the ETFs with the least amount of risk, or lowest absolute value of the minimum, are TLT and LQD - not surprisingly these are the bonds which would be expected to be less risky. SPY also has pretty low risk compared to the very high risk ETFs - EEM and VNQ. The riskiest ETF is the real estate, followed closely by emerging markets. In terms of the return, emerging markets does offer the highest possible return in terms of the max as well as the mean and median returns - so EEM is going to be the high risk/high return ETF. TLT and LQD offer pretty low returns in terms of the maximum, and based off of this and their risk measure, we can say these are the safe ETFs. SPY is somewhere in the middle, offering a pretty good return with not quite as high of risk.
+
+For my analysis, I also simulated 4-week trading for each ETF individually to get the average final wealth and 5% value at risk if I had just taken one ETF in my portfolio. The result of this analysis gives similar results to looking at the summary data, finding TLT and LQD to have lower value at risk (VAR) and lower returns, while EEM and VNQ have much higher VAR and higher returns, with SPY somewhere in the middle.
+We can also look at a correlation matrix of these ETFs:
+
+```{r, echo=FALSE}
+cor(all_returns)
+```
+
+It's important to consider these correlations when choosing a portfolio for several reasons. To get a safe portfolio, you can diversify by having ETFs that are negatively correlated with each other, that way if one ETF does poorly, the other ETF will be doing well and can compensate. Another strategy would be to pick safe ETFs that are positively correlated with each other, that way you know you can rely on all of your ETFs. For an aggressive portfolio, you may want to pick ETFs that are highly positively correlated with each other to maximize your chance of high returns.
+
+With all of these considerations, I will pick a "safe" portfolio consisting of SPY, TLT, and LQD. The TLT and LQD funds are very safe bets that minimize risk and have low return, and the SPY is medium as far as risk and return but it is negatively correlated with TLT so it should compensate if the bonds do poorly. I will go with a distribution of 30% in the SPY, 40% in the TLT, and 30% in the LQD fund. 
+
+For my "aggressive" portfolio, I will put 60% in the high risk/high return EEM fund, and 40% in the VNQ, which is also risky and is positively correlated with EEM.
+
+Using an "even split" portfolio, the average return after using bootstrap resampling to estimate the 4-week trading period is:
+
+```{r, include=FALSE}
+initial_wealth = 100000
+
+# even split portfolio
+set.seed(1)
+sim1 = foreach(i=1:5000, .combine='rbind') %do% {
+  total_wealth = initial_wealth
+  weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(all_returns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+  }
+  wealthtracker
+}
+
+# get average return
+finalwealth = mean(sim1[,n_days])
+```
+```{r, echo=FALSE}
+finalwealth - initial_wealth
+```
+
+And the 5% value at risk is:
+
+```{r, echo=FALSE}
+# 5% value at risk
+VAR = initial_wealth - quantile(sim1[,n_days], 0.05)
+VAR
+```
+
+Now looking at the "safe" portfolio, average return is:
+
+```{r, include=FALSE}
+### Now the safe stock portfolio ###
+
+mysafestocks = c("SPY", "TLT", "LQD")
+getSymbols(mysafestocks, from = "2008-01-01")
+
+for(ticker in mysafestocks) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+
+all_returns = cbind(ClCl(SPYa),
+                     ClCl(TLTa),
+                     ClCl(LQDa))
+
+all_returns = as.matrix(na.omit(all_returns))
+
+# run the sim for the safe portfolio
+initial_wealth = 100000
+set.seed(1)
+sim2 = foreach(i=1:5000, .combine='rbind') %do% {
+  total_wealth = initial_wealth
+  weights = c(0.3, 0.4, 0.3)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(all_returns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+  }
+  wealthtracker
+}
+
+# get average return for safe portfolio
+finalwealthsafe = mean(sim2[,n_days])
+```
+```{r, echo=FALSE}
+finalwealthsafe - initial_wealth
+```
+
+And the 5% value at risk for the safe portfolio is:
+
+```{r, echo=FALSE}
+# 5% value at risk for safe portfolio
+VARsafe = initial_wealth - quantile(sim2[,n_days], 0.05)
+VARsafe
+```
+
+Finally, for the "aggressive"" portfolio, the average return is:
+
+```{r, include=FALSE}
+### Now with the aggressive portfolio ###
+
+myaggstocks = c("EEM", "VNQ")
+getSymbols(myaggstocks, from = "2008-01-01")
+
+for(ticker in myaggstocks) {
+  expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+  eval(parse(text=expr))
+}
+
+all_returns = cbind(ClCl(EEMa),
+                    ClCl(VNQa))
+
+all_returns = as.matrix(na.omit(all_returns))
+
+# run the sim for the aggressive portfolio
+initial_wealth = 100000
+set.seed(1)
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {
+  total_wealth = initial_wealth
+  weights = c(0.6, 0.4)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(all_returns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+  }
+  wealthtracker
+}
+
+# get average return for aggressive portfolio
+finalwealthagg = mean(sim3[,n_days])
+```
+```{r, echo=FALSE}
+finalwealthagg - initial_wealth
+```
+
+And the 5% value at risk for the aggressive portfolio is:
+
+```{r, echo=FALSE}
+# 5% value at risk for aggressive portfolio
+VARagg = initial_wealth - quantile(sim3[,n_days], 0.05)
+VARagg
+```
+
+The results are pretty much as expected - the safe portfolio had the lowest average return and the lowest VAR, the aggressive portfolio had the highest average return and highest VAR, and the even split portfolio was in the middle. My recommendation for which portfolio to choose from will depend on the preference of the investor. An investor who is confident in the market and is looking to capitalize on gains and high returns should choose the aggressive portfolio - the average return is almost 3 times more than the safe portfolio and about 1.5 times higher than the even split. However the risk is about twice as much as the even split and 4 times greater than the safe portfolio, so I would advise this investor to proceed with caution.
+
+Overall, the best option for a more conservative investor is going to be the safe portfolio, which has half the risk of the even split while still getting about 2/3 of the return that the even split makes. This portfolio would be a strong bet to ensure that your money keeps growing over time, and even when the markets do poorly, you won't be suffering too much loss.
+
+\pagebreak
+
+## **Market Segmentation**
+
+```{r, include=FALSE}
+library(corrplot)
+library(factoextra)
+library(FactoMineR)
+
+# set up the data and explore
+tweets = read.csv('social_marketing.csv')
+tweets=tweets[2:37]
+head(tweets)
+summary(tweets)
+```
+
+The goal of this report is to identify interesting market segments that appear to stand out among NutrientH2O's social-media audience. The first step was to explore the data and try to identify which interest categories stand out the most. This plot is a measure of importance of the top interests, or their individual contributions to the overall picture.
+
+```{r, echo=FALSE}
+# look at contributions
+res.ca <- CA(tweets, graph = FALSE)
+fviz_contrib(res.ca, choice ="col", axes = 1, top = 15, title = 'Variable Contributions')
+```
+
+By this it appears that, not surprisingly, health and nutrition plays a large part in the conversations of NutrientH2O's Twitter followers, as well as fitness, cooking, and outdoor activities. And there appears to be a relatively strong influence by college students.
+
+Next, examining the correlations between the interest categories - it's possible to group together some of the followers' interests into particular market segments through hierarchical clustering.
+
+
+```{r echo=FALSE, fig.height=8, fig.width=8}
+# Looking at the correlations
+corrplot(cor(tweets), order = 'hclust', addrect = 8, rect.col = 'blue')
+```
+
+So there are several groups of interets that appear to be correlated together, and form several clusters, or market segments. The large group of interests correlated together in the bottom right is an unsurprising find - these are all things that a lot of people spend a majority of their time on - school, food, family, religion, sports - they're typically high priorities. Another interesting segment from this chart is the group with eco, outdoors, health and nutrition, fitness etc. that is also not surprising to see for this particular group of followers - those would all be people likely to consume the Nutrient H2O product.
+
+One more way to identify market segments is through principal component analysis, and the results can be examined here:
+
+```{r echo=FALSE, fig.height=8, fig.width=8}
+# PCA vizualize
+tweets.pca <- PCA(tweets, graph = FALSE)
+fviz_pca_var(tweets.pca, col.var="contrib",gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE)
+```
+
+The plot shows relative strengths and directions of the various interests - basically grouping them together as well as showing the prevalence of each interest. Again, seeing similar interests grouped together as from the correlations - a strong contribution from the group of family, school, sports, religion etc. and in this case there is a strong contribution from the cooking, fashion, beauty, and photo-sharing group. Also the health/fitness group can be seen together again, so there is strong commonality in the market segments across the different methods of analysis.
+
+Overall, there can be four major market segments identified in the data:
+
+1. People interested in health/nutrition, fitness, and the outdoors
+
+2. People focused on high priority core values such as family and school
+
+3. People interested in creative endeavors such as photography, beauty, and fashion
+
+4. A group of "others" - comprising everything else such as news and tv, gaming, cars, business, and the adult and spam categories

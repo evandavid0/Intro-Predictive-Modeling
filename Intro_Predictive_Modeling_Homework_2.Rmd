@@ -1,0 +1,332 @@
+---
+title: "Exercises 2"
+output: 
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Flights at ABIA
+Here we will be looking at flights into and out of Austin in the year 2008. I will present some interesting findings about flight delays out of Austin.
+
+First, read in the data and examine some of the features. 
+
+```{r, include=FALSE}
+# load the ggplot library and read in the data
+library(ggplot2)
+```
+```{r}
+atxflights = read.csv('ABIA.csv')
+head(atxflights)
+```
+
+```{r}
+summary(atxflights)
+```
+
+I want to take a look at flight delays by day of the week, and by month. However these variables are stored as numeric so we'll convert them to factors to make them better to deal with, as well as give them some labels.
+
+```{r}
+# convert a couple variables to factors
+atxflights$DayOfWeek = factor(atxflights$DayOfWeek, levels = c(1,2,3,4,5,6,7), 
+                              labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))
+atxflights$Month = factor(atxflights$Month, levels = c(1,2,3,4,5,6,7,8,9,10,11,12),
+                          labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+```
+
+I want to find the average flight delay length over each day of the week, so I'll store those in a new data frame.
+
+```{r}
+# get the average length of delays by day of week
+avgdelay = aggregate(atxflights$DepDelay, by = list(atxflights$DayOfWeek), FUN = mean, na.rm = TRUE)
+avgdelay = as.data.frame(avgdelay)
+```
+
+Now we plot flight delays by day of the week.
+
+```{r echo=FALSE, fig.height=7, fig.width=9}
+# plot this
+ggplot(avgdelay, aes(Group.1, x)) + geom_bar(stat = "identity", color="black", fill="steelblue") + labs(x="Day of Week") + labs(title = "Delays by Day of Week") + labs(y="Average Length of Delay")
+
+```
+
+The worst day of the week for delays was Friday - this could be problematic as it is the end of the work week and many people would probably be traveling either back home or leaving on a trip. Wednesday and Saturday are pretty good days if you want to cut down on flight delay time.
+
+Next I want to take a look at the worst delay times by month. Again we'll compute the averages and plot it.
+
+```{r}
+# get average delay by month
+avgdelaymonth = aggregate(atxflights$DepDelay, by = list(atxflights$Month), FUN = mean, na.rm = TRUE)
+avgdelaymonth = as.data.frame(avgdelaymonth)
+```
+```{r echo=FALSE, fig.height=7, fig.width=9}
+# plot departure delays by month
+ggplot(avgdelaymonth, aes(Group.1, x)) + geom_bar(stat = "identity", color="black", fill="steelblue") + labs(x="Month") + labs(title = "Delays by Month") + labs(y="Average Length of Delay")
+```
+
+December is the worst month, followed by March - not surprisingly, as we have the holiday season in December as well as SXSW in Austin during the month of March - expect longer delays at those times.
+
+Let's take a look at the month of December - when do you experience the worst delays?
+
+```{r echo=FALSE, fig.height=7, fig.width=9}
+# select out December from the data
+dec = atxflights[atxflights$Month == "Dec",]
+
+# get the average delays in December
+avgdelaydec = aggregate(dec$DepDelay, by = list(dec$DayofMonth), FUN = mean, na.rm = TRUE)
+avgdelaydec = as.data.frame(avgdelaydec)
+
+# plot delays in December
+ggplot(avgdelaydec, aes(Group.1, x)) + geom_bar(stat = "identity", color="black", fill="steelblue") + labs(x="Day") + labs(title = "Delays in December") + labs(y="Average Length of Delay")
+```
+
+December 27th had the worst delay times - just a couple days after Christmas. Looks like flying on Christmas Day is the way to go! Or do your traveling around December 8th and you'll experience almost no delays. Unfortunately school is still in session!
+
+# Author Attribution
+
+Now we'll look at the C50 corpus and build a couple models to try to predict the author, and see how we do.
+
+The first step was pre-processing which involved reading in the documents, cleaning up file names, getting author names from the files, building the corpus, and removing unnecessary things like numbers, punctuation, stop words, etc.
+
+```{r, include=FALSE}
+setwd("C:/Users/evand/Desktop/Stats/STA380-master")
+# set up the reader function
+library(tm)
+readerPlain = function(fname){
+  readPlain(elem=list(content=readLines(fname)), id=fname, language='en') 
+}
+
+# set up training and test authors
+author_train = Sys.glob('data/ReutersC50/C50train/*')
+author_test = Sys.glob('data/ReutersC50/C50tests/*')
+author_dirs = c(author_train, author_test)
+
+# some pre-processing - clean up the file names
+file_list = NULL
+labels = NULL
+for(author in author_dirs) {
+  author_name = substring(author, first=26)
+  files_to_add = Sys.glob(paste0(author, '/*.txt'))
+  file_list = append(file_list, files_to_add)
+  labels = append(labels, rep(author_name, length(files_to_add)))
+}
+
+# get the author names
+n = length(file_list)
+labels_train = labels[1:(n/2)]
+labels_test = labels[((n/2)+1):n]
+authors = levels(as.factor(labels_train))
+
+
+# read in documents and get the corpus
+all_docs = lapply(file_list, readerPlain) 
+names(all_docs) = file_list
+names(all_docs) = sub('.txt', '', names(all_docs))
+
+corpus = Corpus(VectorSource(all_docs))
+
+# some more pre-processing
+corpus = tm_map(corpus, content_transformer(tolower)) # make everything lowercase
+corpus = tm_map(corpus, content_transformer(removeNumbers)) # remove numbers
+corpus = tm_map(corpus, content_transformer(removePunctuation)) # remove punctuation
+corpus = tm_map(corpus, content_transformer(stripWhitespace)) ## remove excess white-space
+corpus = tm_map(corpus, content_transformer(removeWords), stopwords("SMART"))
+```
+
+Then we build the Document Term Matrix and check the summary.
+
+```{r, echo=FALSE}
+# get the document term matrix
+DTM = DocumentTermMatrix(corpus)
+DTM
+```
+
+There are 45000+ terms here - we need to remove sparce terms to cut that number down. We'll remove terms that didn't come up in 97.5% of the documents.
+
+```{r, echo=FALSE}
+# remove sparse terms
+DTM = removeSparseTerms(DTM, 0.975)
+DTM
+```
+
+Much better - about 1400 terms now.
+
+Next we set up the training and test sets from the Document Term Matrix, and we will simply ignore words in the test set that didn't appear in the training set in order to avoid getting zero probabilities.
+
+```{r, include=FALSE}
+# set up training and test set
+X = as.matrix(DTM)
+train = X[1:2500,]
+test = X[2501:5000,]
+
+# ignore words in test set that don't occur in training set
+test = as.matrix(test[,intersect(colnames(train), colnames(test))])
+train = as.matrix(train[,intersect(colnames(train), colnames(test))])
+```
+
+We will try a random forest using PCA to get the first 100 principal components to put in the random forest model.
+
+```{r, include=FALSE}
+# PCA for random forests
+pca = prcomp(train)
+plot(pca)
+
+# get the first 100 principal components and get pca predictions
+train.new = pca$x[, 1:100]
+train.new = as.data.frame(train.new)
+train.new$authors = as.factor(labels_train)
+test.pca = predict(pca, newdata = test)
+
+# run random forest
+library(randomForest)
+set.seed(1)
+rf_pca = randomForest(authors~., data = train.new, importance = TRUE, ntrees = 200, mtry = 10)
+
+# check the predictions vs test set
+pred_rf = predict(rf_pca, test.pca, type = 'response')
+correct = 0
+for (i in seq(1, (n/2))) {
+  if (labels_test[i] == pred_rf[i]) {
+    correct = correct + 1
+  }
+}
+
+# check the accuracy
+accuracy_rf = correct/(n/2)
+```
+
+The accuracy of the random forest turns out to be:
+
+```{r}
+accuracy_rf
+```
+
+Not so great as we get an accuracy of 51%. Let's try another model.
+
+Next we'll try a Naive Bayes model. First we use the training set and apply a smoothing function, then get the predictions and check them against the test set.
+
+```{r, include=FALSE}
+# apply a smoothing function
+authors = unique(authors)
+smooth_count = 1/nrow(train)
+for (i in 1:50){
+  w_label = paste("w",authors[i],sep="_")
+  weight = colSums(train[(50*i-49):(50*i),] + smooth_count)
+  assign(w_label, weight/sum(weight))
+  
+}
+
+# run a Naive Bayes model
+nb_act = NULL
+nb_pred = NULL
+
+for (i in 1:50)
+  for (j in 1:50)
+    nb_act = c(nb_act, i)
+
+for (i in 1:2500){
+  max = -10000
+  index = 0
+  for (j in 1:50){
+    w_label = paste("w",authors[j],sep="_")
+    nbtest = test[i,]
+    test_value = sum(nbtest*log(get(w_label)))
+    if (test_value > max){
+      max = test_value
+      index = j
+    }
+  }
+  nb_pred = c(nb_pred, index)
+}
+
+# check predictions
+correct = 0
+for (i in 1:2500){
+  if (nb_pred[i]==nb_act[i]){correct = correct + 1}
+}
+
+# get the accuracy of Naive Bayes
+accuracy_nb = correct/2500
+```
+
+Then we get the accuracy for Naive Bayes:
+
+```{r}
+accuracy_nb
+```
+
+It turns out Naive Bayes has an accuracy of about 60%, better than that of random forest. The table below shows the authors with how well the model did at predicting each author.
+
+```{r, include=FALSE}
+nbconfmat = matrix(0, nrow = 50, ncol = 50)
+nbconfmat = data.frame(matrix(0, nrow = 50, ncol = 50),row.names = unique(authors))
+colnames(nbconfmat) = c(unique(authors))
+
+for (i in 1:2500){
+  nbconfmat[nb_pred[i],nb_act[i]] = nbconfmat[nb_pred[i],nb_act[i]] + 1
+}
+
+nbconfmat[,1:4]
+
+author = NULL
+author = c(unique(authors))
+
+accuracy = NULL
+nbcorrect = NULL
+
+for (i in 1:50){
+  accuracy_i = nbconfmat[i,i]/50
+  accuracy_i = format(round(accuracy_i, 2), nsmall = 2)
+  accuracy = c(accuracy, accuracy_i)
+  nbcorrect = c(nbcorrect, nbconfmat[i,i])
+}
+```
+```{r, echo=FALSE}
+data.frame(author, nbcorrect, accuracy)
+```
+
+The model did well at predicting Jim Gilchrist - 100% accuracy. However, it did very poorly at predicting David Lawder. Let's take a look.
+
+```{r, echo=FALSE}
+vector = c(nbconfmat[,8])
+data.frame(author,vector)
+```
+
+The model attributed many of David Lawder's documents to the author Todd Nissen, so perhaps these two authors are difficult to distinguish.
+
+Overall, the Naive Bayes model performed the best, and even though it assumes independent features and we know that many words are correlated with each other, the Naive Bayes model had much better accuracy than random forest so we will choose Naive Bayes.
+
+# Association Rules Mining
+
+```{r, include=FALSE}
+detach(package:tm, unload=TRUE)
+setwd("C:/Users/evand/Desktop/Stats")
+library(arules)
+groceries = read.transactions('groceries.txt', sep = ',', format = 'basket')
+head(groceries)
+dim(groceries)
+```
+
+Here we will examine some interesting association rules among shopping baskets from the data on grocery purchases. We will set a support threshold of 0.01 to get rules that occurred in 1% of the data, and confidence of 0.5 to get rules that were correct at least half the time. Setting the maximum size to 4 made no difference so we set it to 3. This gave 15 rules.
+
+```{r, include=FALSE}
+groceryrules = apriori(groceries, parameter=list(support=.01, confidence=.5, maxlen=3))
+```
+```{r}
+inspect(groceryrules)
+```
+
+Most of these rules predict whole milk, with a few predicting other vegetables. The rules predicting whole milk generally have other dairy items like yogurt, butter, or eggs, indicating people tend to buy milk when they buy other dairy items. Other vegetables were commonly associated with people buying root vegetables and some kind of fruit - these shoppers tend to buy fruits and vegetables together. Overall this gave a pretty small sample of rules, so we will change a couple parameters to try to look at other common rules.
+
+We'll set the support to 0.001 to try and include more rules, and to compensate this we'll set confidence to 0.8 and only look at the rules with lift > 5. There was not much change increasing the maximum length above 5 so we set it to 5.
+
+```{r, include=FALSE}
+groceryrules2 = apriori(groceries, parameter=list(support=.001, confidence=.8, maxlen=5))
+```
+```{r}
+inspect(subset(groceryrules2, subset=lift > 5))
+```
+
+This gives us some more interesting rules to work with. There are quite a few associations of yogurt here with other dairy items so that reaffirms the previous finding about dairy shoppers, as well as different fruits showing up in many of the rules that predict yogurt - makes sense as people like to mix fruit and yogurt. One very interesting rule here is liquor and red wine predicting bottled beer, as it has the highest lift and a very high confidence of over 90%. Basically it's very significant and people will likely buy bottled beer when they have bought liquor and wine as well, so a grocery store should be sure to put beer close by the liquor and wine, and maybe include some promotional marketing or coupons to maximize profits. 
